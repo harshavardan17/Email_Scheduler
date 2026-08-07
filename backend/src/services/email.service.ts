@@ -25,12 +25,16 @@ class EmailService {
 
     console.log("✅ Email Saved:", email.id);
 
+    const scheduledDate = new Date(data.scheduledTime);
+
     const delay = Math.max(
-      new Date(data.scheduledTime).getTime() - Date.now(),
+      scheduledDate.getTime() - Date.now(),
       0
     );
 
-    console.log("⏱ Delay:", delay, "ms");
+    console.log("🕒 Current Time :", new Date().toISOString());
+    console.log("📅 Scheduled At :", scheduledDate.toISOString());
+    console.log("⏱ Delay (ms)   :", delay);
 
     const job = await emailQueue.add(
       "send-email",
