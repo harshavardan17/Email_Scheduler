@@ -24,13 +24,7 @@ function EmailForm() {
     event.preventDefault();
 
     try {
-      // Convert local datetime to ISO before sending
-      const payload = {
-        ...form,
-        scheduledTime: new Date(form.scheduledTime).toISOString(),
-      };
-
-      const response = await api.post("/emails/schedule", payload);
+      const response = await api.post("/emails/schedule", form);
 
       setMessage(`✅ Email scheduled successfully! ID: ${response.data.data.id}`);
 
@@ -90,7 +84,9 @@ function EmailForm() {
           name="scheduledTime"
           value={form.scheduledTime}
           onChange={handleChange}
-          min={new Date().toISOString().slice(0, 16)}
+          min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+          .toISOString()
+          .slice(0, 16)}
           required
         />
 
