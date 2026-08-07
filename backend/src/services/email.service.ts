@@ -11,58 +11,72 @@ class EmailService {
   // Single Email
   // ==========================
   async scheduleSingle(data: ScheduleEmailDto) {
+  // User selects local IST time from the frontend
+  const scheduledDate = new Date(data.scheduledTime);
 
-    const email = await prisma.emailJob.create({
-      data: {
-        recipient: data.recipient,
-        subject: data.subject,
-        body: data.body,
-        scheduledTime: new Date(data.scheduledTime),
-        delayBetween: Number(process.env.DEFAULT_DELAY),
-        hourlyLimit: Number(process.env.MAX_EMAILS_PER_HOUR),
-      },
-    });
+  const delay = Math.max(
+    scheduledDate.getTime() - Date.now(),
+    0
+  );
 
-    console.log("✅ Email Saved:", email.id);
+  const email = await prisma.emailJob.create({
+    data: {
+      recipient: data.recipient,
+      subject: data.subject,
+      body: data.body,
+      scheduledTime: scheduledDate,
+      delayBetween: Number(process.env.DEFAULT_DELAY),
+      hourlyLimit: Number(process.env.MAX_EMAILS_PER_HOUR),
+    },
+  });
 
-    const scheduledDate = new Date(data.scheduledTime);
+  console.log("✅ Email Saved:", email.id);
+  console.log(
+    "🕒 Current IST:",
+    new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+    })
+  );
 
-    const delay = Math.max(
-      scheduledDate.getTime() - Date.now(),
-      0
-    );
+  console.log(
+    "📅 Scheduled IST:",
+    scheduledDate.toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+    })
+  );
 
-    console.log("🕒 Current Time :", new Date().toISOString());
-    console.log("📅 Scheduled At :", scheduledDate.toISOString());
-    console.log("⏱ Delay (ms)   :", delay);
+  console.log("⏱ Delay:", delay, "ms");
 
-    const job = await emailQueue.add(
-      "send-email",
-      {
-        emailId: email.id,
-      },
-      {
-        jobId: email.id,
-        delay,
-      }
-    );
+  const job = await emailQueue.add(
+    "send-email",
+    {
+      emailId: email.id,
+    },
+    {
+      jobId: email.id,
+      delay,
+    }
+  );
 
-    console.log("✅ BullMQ Job Created:", job.id);
+  console.log("✅ BullMQ Job Created:", job.id);
 
-    const counts = await emailQueue.getJobCounts();
-    console.log("📊 Queue counts after add:", counts);
+  const counts = await emailQueue.getJobCounts();
+  console.log("📊 Queue counts:", counts);
 
-    await prisma.emailJob.update({
-      where: {
-        id: email.id,
-      },
-      data: {
-        bullJobId: String(job.id),
-      },
-    });
+  const delayedJobs = await emailQueue.getDelayed();
+  console.log("📦 Delayed Jobs:", delayedJobs.length);
 
-    return email;
-  }
+  await prisma.emailJob.update({
+    where: {
+      id: email.id,
+    },
+    data: {
+      bullJobId: String(job.id),
+    },
+  });
+
+  return email;
+}
 
   // ==========================
   // Bulk Email (CSV)
