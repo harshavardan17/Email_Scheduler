@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import { formatDateInIndia } from "../utils/date";
 
 interface SentEmail {
   id: string;
@@ -41,15 +42,7 @@ function SentTable() {
     return () => window.clearInterval(intervalId);
   }, []);
 
-  const formatSentTime = (value: string) => {
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-      return "—";
-    }
-
-    return date.toLocaleString();
-  };
+  const formatSentTime = (value: string) => formatDateInIndia(value);
 
   return (
     <div className="rounded-2xl border border-slate-700 bg-slate-800/80 p-6 shadow-lg shadow-slate-950/20">

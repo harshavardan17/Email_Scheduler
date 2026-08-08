@@ -1,5 +1,22 @@
 import { Request, Response } from "express";
 import emailService from "../services/email.service";
+import { parseScheduledDateValue } from "../utils/date";
+
+function normalizeDateInput(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
+    return "";
+  }
+
+  try {
+    return parseScheduledDateValue(value).toISOString();
+  } catch {
+    return "";
+  }
+}
 
 class EmailController {
   async schedule(req: Request, res: Response) {
@@ -9,7 +26,7 @@ class EmailController {
         recipients: Array.isArray(body?.recipients) ? body.recipients : [],
         subject: body?.subject ?? "",
         body: body?.body ?? "",
-        startTime: body?.startTime ?? body?.scheduledTime ?? "",
+        startTime: normalizeDateInput(body?.startTime ?? body?.scheduledTime),
         delayBetweenEmails: Number(body?.delayBetweenEmails ?? body?.delayBetween ?? 0),
         hourlyLimit: Number(body?.hourlyLimit ?? body?.limit ?? 100),
       };
@@ -17,10 +34,10 @@ class EmailController {
       if (Array.isArray(normalizedBody.recipients) && normalizedBody.recipients.length > 0) {
         const result = await emailService.schedule(normalizedBody);
 
-        if (result.failures.length) {
-          return res.status(500).json({
+        if (!result.jobs.length) {
+          return res.status(400).json({
             success: false,
-            scheduled: result.jobs.length,
+            scheduled: 0,
             failed: result.failures.length,
             errors: result.failures,
           });
@@ -28,14 +45,24 @@ class EmailController {
 
         return res.status(201).json({
           success: true,
-          scheduled: result.jobs.length,
-          failed: 0,
-          errors: [],
+          scheduled: result.scheduledCount,
+          failed: result.failures.length,
+          errors: result.failures,
+          partial: result.failures.length > 0,
+          count: result.scheduledCount,
           data: result.jobs,
         });
       }
 
-      const email = await emailService.scheduleSingle(body);
+      const normalizedSingleBody = {
+        ...body,
+        recipient: body?.recipient ?? "",
+        subject: body?.subject ?? "",
+        body: body?.body ?? "",
+        scheduledTime: normalizeDateInput(body?.scheduledTime ?? body?.startTime),
+      };
+
+      const email = await emailService.scheduleSingle(normalizedSingleBody);
 
       return res.status(201).json({
         success: true,

@@ -1,7 +1,9 @@
 import { Queue, Job } from "bullmq";
 import redis from "../config/redis";
 
-export const emailQueue = new Queue("email-queue", {
+const queueName = process.env.QUEUE_NAME || "email-queue";
+
+export const emailQueue = new Queue(queueName, {
   connection: redis,
   defaultJobOptions: {
     attempts: 3,

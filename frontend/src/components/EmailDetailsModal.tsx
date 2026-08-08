@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 import type { EmailJob } from "../services/emailService";
+import { formatDateInIndia } from "../utils/date";
 
 interface EmailDetailsModalProps {
   email: EmailJob;
@@ -46,13 +47,13 @@ function EmailDetailsModal({ email, onClose }: EmailDetailsModalProps) {
 
           <div className="rounded-3xl border border-slate-800/90 bg-slate-900/80 p-5">
             <p className="text-sm text-slate-400">Scheduled</p>
-            <p className="mt-2 text-base text-slate-200">{new Date(email.scheduledTime).toLocaleString()}</p>
+            <p className="mt-2 text-base text-slate-200">{formatDateInIndia(email.scheduledTime)}</p>
           </div>
 
           <div className="rounded-3xl border border-slate-800/90 bg-slate-900/80 p-5">
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm text-slate-400">Sent time</p>
-              <p className="text-sm text-slate-400">{email.sentAt ? new Date(email.sentAt).toLocaleString() : "Not sent yet"}</p>
+              <p className="text-sm text-slate-400">{email.sentAt ? formatDateInIndia(email.sentAt) : "Not sent yet"}</p>
             </div>
           </div>
 

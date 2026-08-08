@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ChangeEvent, DragEvent, FormEvent } from "react";
 import api from "../api/axios";
+import { getLocalDatetimeInputValue, toISOStringFromLocalDatetimeInput } from "../utils/date";
 
 interface UploadResponse {
   success: boolean;
@@ -153,7 +154,7 @@ function UploadCSV() {
       recipients: previewEmails,
       subject: nextSubject,
       body: nextBody,
-      startTime: nextStartTime,
+      startTime: toISOStringFromLocalDatetimeInput(nextStartTime) ?? nextStartTime,
       delayBetweenEmails: Number(nextDelayBetweenEmails),
       hourlyLimit: Number(nextHourlyLimit),
     };
@@ -162,14 +163,21 @@ function UploadCSV() {
 
     try {
       const response = await api.post("/emails/schedule-bulk", requestBody);
-      const scheduledCount = response.data?.count ?? previewEmails.length;
-      const failedCount = previewEmails.length - scheduledCount;
+      const scheduledCount = response.data?.scheduled ?? response.data?.count ?? previewEmails.length;
+      const failedCount = Number(response.data?.failed ?? 0);
 
-      setSuccessMessage(
-        `Scheduled ${scheduledCount} email(s) successfully.` +
-          (failedCount > 0 ? ` ${failedCount} failed to schedule.` : "")
-      );
-      resetForm();
+      if (scheduledCount > 0) {
+        setSuccessMessage(
+          `Scheduled ${scheduledCount} email(s) successfully.` +
+            (failedCount > 0 ? ` ${failedCount} failed to schedule.` : "")
+        );
+      } else {
+        setErrorMessage("Unable to schedule any recipients. Please check the CSV data and try again.");
+      }
+
+      if (scheduledCount > 0) {
+        resetForm();
+      }
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -300,6 +308,7 @@ function UploadCSV() {
               type="datetime-local"
               value={startTime}
               onChange={(event) => setStartTime(event.target.value)}
+              min={getLocalDatetimeInputValue(new Date())}
               className="w-full rounded-xl border border-slate-600 bg-slate-800 px-3 py-2.5 text-sm text-white outline-none transition focus:border-sky-400"
             />
           </div>

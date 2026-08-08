@@ -1,5 +1,6 @@
 import { useState } from "react";
 import api from "../api/axios";
+import { getLocalDatetimeInputValue, toISOStringFromLocalDatetimeInput } from "../utils/date";
 
 function EmailForm() {
   const [form, setForm] = useState({
@@ -24,7 +25,13 @@ function EmailForm() {
     event.preventDefault();
 
     try {
-      const response = await api.post("/emails/schedule", form);
+      const payload = {
+        ...form,
+        // Preserve the user's selected local date/time and send it as an ISO timestamp.
+        scheduledTime: toISOStringFromLocalDatetimeInput(form.scheduledTime) ?? form.scheduledTime,
+      };
+
+      const response = await api.post("/emails/schedule", payload);
 
       setMessage(`✅ Email scheduled successfully! ID: ${response.data.data.id}`);
 
@@ -84,9 +91,7 @@ function EmailForm() {
           name="scheduledTime"
           value={form.scheduledTime}
           onChange={handleChange}
-          min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-          .toISOString()
-          .slice(0, 16)}
+          min={getLocalDatetimeInputValue(new Date())}
           required
         />
 
