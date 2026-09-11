@@ -1,35 +1,42 @@
 import IORedis from "ioredis";
 
-const redis = new IORedis(process.env.REDIS_URL!, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-  lazyConnect: false,
-  connectTimeout: 10000,
-  keepAlive: 30000,
-  retryStrategy(times) {
-    console.log(`🔄 Redis reconnect: ${times}`);
-    return Math.min(times * 1000, 5000);
-  },
-});
+const configuredRedisUrl = process.env.REDIS_URL;
 
-redis.on("connect", () => {
-  console.log("✅ Redis Connected");
-});
+if (!configuredRedisUrl) {
+  throw new Error("REDIS_URL is required");
+}
 
-redis.on("ready", () => {
-  console.log("🚀 Redis Ready");
-});
+const redisUrl: string = configuredRedisUrl;
 
-redis.on("reconnecting", () => {
-  console.log("🔄 Redis Reconnecting...");
-});
+function createRedisConnection(name: string, maxRetriesPerRequest: number | null) {
+  const connection = new IORedis(redisUrl, {
+    maxRetriesPerRequest,
+    connectTimeout: 10000,
+    keepAlive: 30000,
+    retryStrategy(times: number) {
+      const delay = Math.min(times * 500, 5000);
+      console.warn(`Redis ${name} reconnecting in ${delay}ms (attempt ${times})`);
+      return delay;
+    },
+  });
 
-redis.on("end", () => {
-  console.log("❌ Redis Connection Closed");
-});
+  connection.on("connect", () => console.log(`Redis ${name} connected`));
+  connection.on("ready", () => console.log(`Redis ${name} ready`));
+  connection.on("reconnecting", () => console.warn(`Redis ${name} reconnecting`));
+  connection.on("end", () => console.warn(`Redis ${name} connection closed`));
+  connection.on("error", (error) => console.error(`Redis ${name} error`, error));
 
-redis.on("error", (err) => {
-  console.error("❌ Redis Error:", err);
-});
+  return connection;
+}
 
-export default redis;
+export const queueRedis = createRedisConnection("queue", 20);
+export const workerRedis = createRedisConnection("worker", null);
+
+export async function checkRedisHealth(): Promise<boolean> {
+  try {
+    return (await queueRedis.ping()) === "PONG";
+  } catch (error) {
+    console.error("Redis health check failed", error);
+    return false;
+  }
+}

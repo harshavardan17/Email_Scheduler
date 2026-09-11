@@ -19,10 +19,13 @@ interface SentApiResponse {
 function SentTable() {
   const [emails, setEmails] = useState<SentEmail[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   const fetchSentEmails = async () => {
     try {
-      const response = await api.get<SentApiResponse>("/emails/sent");
+      const response = await api.get<SentApiResponse>("/emails/sent", {
+        params: { search, page: 1, limit: 100 },
+      });
       setEmails(response.data.data ?? []);
     } catch (error) {
       console.error("Failed to fetch sent emails", error);
@@ -40,7 +43,7 @@ function SentTable() {
     }, 5000);
 
     return () => window.clearInterval(intervalId);
-  }, []);
+  }, [search]);
 
   const formatSentTime = (value: string) => formatDateInIndia(value);
 
@@ -56,6 +59,15 @@ function SentTable() {
             {emails.length} {emails.length === 1 ? "email" : "emails"}
           </span>
         )}
+      </div>
+
+      <div className="mb-4">
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search by recipient or subject"
+          className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500"
+        />
       </div>
 
       {loading ? (

@@ -6,8 +6,9 @@ import prisma from "./config/db";
 import "./config/redis";
 import "./queue/email.worker";
 import uploadRoutes from "./routes/upload.routes";
+import { requireAuth } from "./middleware/auth.middleware";
 
-app.use("/api/uploads", uploadRoutes);
+app.use("/api/uploads", requireAuth, uploadRoutes);
 
 const PORT = Number(process.env.PORT) || 5000;
 

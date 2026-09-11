@@ -7,13 +7,11 @@ router.post("/schedule", emailController.schedule);
 router.post("/schedule-bulk", emailController.schedule);
 
 router.get("/scheduled", emailController.scheduled);
-
 router.get("/sent", emailController.sent);
-
+router.get("/summary", emailController.summary);
+router.patch("/:id", emailController.update);
 router.delete("/", emailController.destroyAllEmails);
-
 router.delete("/:id", emailController.deleteScheduledEmail);
-
 router.get("/:id", emailController.getById);
 
 export default router;

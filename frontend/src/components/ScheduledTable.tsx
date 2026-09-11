@@ -14,10 +14,13 @@ function ScheduledTable() {
   const [emails, setEmails] = useState<ScheduledEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const fetchScheduledEmails = async () => {
     try {
-      const response = await api.get("/emails/scheduled");
+      const response = await api.get("/emails/scheduled", {
+        params: { search, page: 1, limit: 100 },
+      });
       setEmails(response.data.data || []);
     } catch (error) {
       console.error("Failed to fetch scheduled emails:", error);
@@ -35,7 +38,7 @@ function ScheduledTable() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [search]);
 
   const formatScheduledTime = (value: string) => formatDateInIndia(value);
 
@@ -52,6 +55,29 @@ function ScheduledTable() {
       alert("Unable to delete email.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleEdit = async (email: ScheduledEmail) => {
+    const recipient = window.prompt("Update recipient email", email.recipient);
+    if (recipient === null) return;
+
+    const subject = window.prompt("Update subject", email.subject);
+    if (subject === null) return;
+
+    const scheduledTime = window.prompt("Update scheduled time (ISO or local format)", email.scheduledTime);
+    if (scheduledTime === null) return;
+
+    try {
+      await api.patch(`/emails/${email.id}`, {
+        recipient: recipient.trim(),
+        subject: subject.trim(),
+        scheduledTime,
+      });
+      fetchScheduledEmails();
+    } catch (error) {
+      console.error("Failed to update email:", error);
+      alert("Unable to update email.");
     }
   };
 
@@ -72,6 +98,15 @@ function ScheduledTable() {
             {emails.length} {emails.length === 1 ? "Email" : "Emails"}
           </span>
         )}
+      </div>
+
+      <div className="mb-4">
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search recipient or subject"
+          className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-500"
+        />
       </div>
 
       {loading ? (
@@ -117,15 +152,23 @@ function ScheduledTable() {
                   </td>
 
                   <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => handleDelete(email.id)}
-                      disabled={deletingId === email.id}
-                      className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
-                    >
-                      {deletingId === email.id
-                        ? "Deleting..."
-                        : "Delete"}
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleEdit(email)}
+                        className="rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-sky-700"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(email.id)}
+                        disabled={deletingId === email.id}
+                        className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {deletingId === email.id
+                          ? "Deleting..."
+                          : "Delete"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

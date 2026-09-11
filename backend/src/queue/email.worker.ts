@@ -6,7 +6,7 @@ dotenv.config({
 });
 
 import { Worker } from "bullmq";
-import redis from "../config/redis";
+import { workerRedis } from "../config/redis";
 import prisma from "../config/db";
 import mailService from "../services/mail.service";
 import { canSendEmail } from "../utils/rateLimiter";
@@ -141,7 +141,7 @@ const worker = new Worker(
     }
   },
   {
-    connection: redis,
+    connection: workerRedis,
     concurrency: Number(process.env.WORKER_CONCURRENCY) || 1,
   }
 );

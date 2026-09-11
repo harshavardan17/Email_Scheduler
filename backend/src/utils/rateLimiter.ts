@@ -1,4 +1,4 @@
-import redis from "../config/redis";
+import { queueRedis as redis } from "../config/redis";
 
 export async function canSendEmail(hourlyLimit: number): Promise<boolean> {
   const now = new Date();

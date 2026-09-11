@@ -19,9 +19,6 @@ class EmailService {
     return parseScheduledDateValue(value);
   }
 
-  // ==========================
-  // Single Email
-  // ==========================
   async scheduleSingle(data: ScheduleEmailDto) {
     const scheduledDate = this.parseScheduledDate(String(data.scheduledTime ?? ""));
     const delay = Math.max(scheduledDate.getTime() - Date.now(), 0);
@@ -39,30 +36,18 @@ class EmailService {
 
     const job = await emailQueue.add(
       "send-email",
-      {
-        emailId: email.id,
-      },
-      {
-        jobId: email.id,
-        delay,
-      }
+      { emailId: email.id },
+      { jobId: email.id, delay }
     );
 
     await prisma.emailJob.update({
-      where: {
-        id: email.id,
-      },
-      data: {
-        bullJobId: String(job.id),
-      },
+      where: { id: email.id },
+      data: { bullJobId: String(job.id) },
     });
 
     return email;
   }
 
-  // ==========================
-  // Bulk Email (CSV)
-  // ==========================
   async schedule(data: ScheduleBulkEmailDto) {
     if (!data.recipients?.length) {
       throw new Error("Recipients are required");
@@ -99,7 +84,6 @@ class EmailService {
         continue;
       }
 
-      // Each subsequent recipient uses the same base instant and adds a fixed delay in seconds.
       const scheduledTime =
         baseStartTime.getTime() +
         i * Number(data.delayBetweenEmails || 0) * 1000;
@@ -131,22 +115,13 @@ class EmailService {
       try {
         const job = await emailQueue.add(
           "send-email",
-          {
-            emailId: email.id,
-          },
-          {
-            jobId: email.id,
-            delay: Math.max(scheduledTime - Date.now(), 0),
-          }
+          { emailId: email.id },
+          { jobId: email.id, delay: Math.max(scheduledTime - Date.now(), 0) }
         );
 
         await prisma.emailJob.update({
-          where: {
-            id: email.id,
-          },
-          data: {
-            bullJobId: String(job.id),
-          },
+          where: { id: email.id },
+          data: { bullJobId: String(job.id) },
         });
 
         jobs.push(email);
@@ -159,13 +134,8 @@ class EmailService {
         console.error("Failed scheduling: recipient queue job", recipient, error);
 
         await prisma.emailJob.update({
-          where: {
-            id: email.id,
-          },
-          data: {
-            status: "FAILED",
-            error: failure.error,
-          },
+          where: { id: email.id },
+          data: { status: "FAILED", error: failure.error },
         });
 
         failures.push(failure);
@@ -187,40 +157,119 @@ class EmailService {
     };
   }
 
-  async getScheduledEmails() {
+  private getSearchFilter(search: string) {
+    const cleanSearch = search.trim();
+    if (!cleanSearch) {
+      return undefined;
+    }
+
+    return {
+      OR: [
+        { recipient: { contains: cleanSearch, mode: "insensitive" as const } },
+        { subject: { contains: cleanSearch, mode: "insensitive" as const } },
+      ],
+    };
+  }
+
+  async getScheduledEmails(options: { search?: string; page?: number; limit?: number } = {}) {
+    const page = Math.max(1, Number(options.page ?? 1));
+    const limit = Math.min(100, Math.max(1, Number(options.limit ?? 10)));
+    const search = options.search ?? "";
+
     return prisma.emailJob.findMany({
       where: {
-        status: "PENDING",
+        status: { in: ["PENDING", "PROCESSING"] },
+        ...this.getSearchFilter(search),
       },
-      orderBy: {
-        scheduledTime: "asc",
-      },
+      orderBy: { scheduledTime: "asc" },
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 
-  async getSentEmails() {
+  async getSentEmails(options: { search?: string; page?: number; limit?: number } = {}) {
+    const page = Math.max(1, Number(options.page ?? 1));
+    const limit = Math.min(100, Math.max(1, Number(options.limit ?? 10)));
+    const search = options.search ?? "";
+
     return prisma.emailJob.findMany({
       where: {
         status: "SENT",
+        ...this.getSearchFilter(search),
       },
-      orderBy: {
-        sentAt: "desc",
-      },
+      orderBy: { sentAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 
+  async getDashboardSummary() {
+    const [all, pending, processing, sent, failed] = await Promise.all([
+      prisma.emailJob.count(),
+      prisma.emailJob.count({ where: { status: "PENDING" } }),
+      prisma.emailJob.count({ where: { status: "PROCESSING" } }),
+      prisma.emailJob.count({ where: { status: "SENT" } }),
+      prisma.emailJob.count({ where: { status: "FAILED" } }),
+    ]);
+
+    const recent = await prisma.emailJob.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 6,
+    });
+
+    return {
+      total: all,
+      pending,
+      processing,
+      sent,
+      failed,
+      scheduled: pending + processing,
+      recent,
+    };
+  }
+
   async getById(id: string) {
-    return prisma.emailJob.findUnique({
-      where: {
-        id,
+    return prisma.emailJob.findUnique({ where: { id } });
+  }
+
+  async updateEmail(
+    id: string,
+    data: { recipient?: string; subject?: string; body?: string; scheduledTime?: string }
+  ) {
+    const existing = await prisma.emailJob.findUnique({ where: { id } });
+
+    if (!existing) {
+      throw new Error("Email not found");
+    }
+
+    const nextRecipient = data.recipient?.trim();
+    if (nextRecipient && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextRecipient)) {
+      throw new Error("Recipient must be a valid email address");
+    }
+
+    if (data.subject && !data.subject.trim()) {
+      throw new Error("Subject cannot be empty");
+    }
+
+    if (data.body && !data.body.trim()) {
+      throw new Error("Body cannot be empty");
+    }
+
+    const scheduledTime = data.scheduledTime ? parseScheduledDateValue(data.scheduledTime) : undefined;
+
+    return prisma.emailJob.update({
+      where: { id },
+      data: {
+        recipient: nextRecipient ?? existing.recipient,
+        subject: data.subject?.trim() ?? existing.subject,
+        body: data.body?.trim() ?? existing.body,
+        scheduledTime: scheduledTime ?? existing.scheduledTime,
       },
     });
   }
 
   async deleteScheduledEmail(id: string) {
-    const email = await prisma.emailJob.findUnique({
-      where: { id },
-    });
+    const email = await prisma.emailJob.findUnique({ where: { id } });
 
     if (!email) {
       throw new Error("Email not found");
@@ -234,9 +283,7 @@ class EmailService {
       }
     }
 
-    await prisma.emailJob.delete({
-      where: { id },
-    });
+    await prisma.emailJob.delete({ where: { id } });
 
     return { success: true };
   }

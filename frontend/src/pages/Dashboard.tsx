@@ -3,13 +3,14 @@ import { toast } from "react-hot-toast";
 import DashboardCards from "../components/DashboardCards";
 import EmailForm from "../components/EmailForm";
 import ScheduledTable from "../components/ScheduledTable";
-// import SentTable from "../components/SentTable";
 import {
   getScheduledEmails,
   getSentEmails,
   destroyAllEmails,
 } from "../services/emailService";
 import type { EmailJob } from "../services/emailService";
+
+const normalizeStatus = (value?: string | null) => String(value ?? "").toLowerCase();
 
 function Dashboard() {
   const [scheduledEmails, setScheduledEmails] = useState<EmailJob[]>([]);
@@ -60,9 +61,9 @@ function Dashboard() {
       <DashboardCards
         counts={{
           total: scheduledEmails.length + sentEmails.length,
-          pending: scheduledEmails.filter((email) => email.status === "pending").length,
+          pending: scheduledEmails.filter((email) => normalizeStatus(email.status) === "pending").length,
           sent: sentEmails.length,
-          failed: scheduledEmails.filter((email) => email.status === "failed").length,
+          failed: scheduledEmails.filter((email) => normalizeStatus(email.status) === "failed").length,
           scheduled: scheduledEmails.length,
         }}
         onRefresh={refresh}

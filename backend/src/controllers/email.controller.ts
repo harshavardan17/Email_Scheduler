@@ -68,43 +68,48 @@ class EmailController {
         success: true,
         data: email,
       });
-
     } catch (error: any) {
-
       return res.status(500).json({
         success: false,
         message: error.message,
       });
-
     }
   }
 
   async scheduled(req: Request, res: Response) {
-
-    const emails = await emailService.getScheduledEmails();
+    const emails = await emailService.getScheduledEmails({
+      search: String(req.query.search ?? ""),
+      page: Number(req.query.page ?? 1),
+      limit: Number(req.query.limit ?? 10),
+    });
 
     return res.json({
       success: true,
       count: emails.length,
       data: emails,
     });
-
   }
 
   async sent(req: Request, res: Response) {
-
-    const emails = await emailService.getSentEmails();
+    const emails = await emailService.getSentEmails({
+      search: String(req.query.search ?? ""),
+      page: Number(req.query.page ?? 1),
+      limit: Number(req.query.limit ?? 10),
+    });
 
     return res.json({
       success: true,
       count: emails.length,
       data: emails,
     });
+  }
 
+  async summary(req: Request, res: Response) {
+    const summary = await emailService.getDashboardSummary();
+    return res.json({ success: true, data: summary });
   }
 
   async getById(req: Request<{ id: string }>, res: Response) {
-
     const email = await emailService.getById(req.params.id);
 
     if (!email) {
@@ -118,13 +123,29 @@ class EmailController {
       success: true,
       data: email,
     });
+  }
 
+  async update(req: Request<{ id: string }>, res: Response) {
+    try {
+      const result = await emailService.updateEmail(req.params.id, {
+        recipient: req.body?.recipient,
+        subject: req.body?.subject,
+        body: req.body?.body,
+        scheduledTime: normalizeDateInput(req.body?.scheduledTime),
+      });
+
+      return res.json({ success: true, data: result });
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Unable to update email",
+      });
+    }
   }
 
   async destroyAllEmails(req: Request, res: Response) {
     try {
       const result = await emailService.destroyAllEmails();
-
       return res.json(result);
     } catch (error: any) {
       return res.status(500).json({
@@ -137,7 +158,6 @@ class EmailController {
   async deleteScheduledEmail(req: Request<{ id: string }>, res: Response) {
     try {
       const result = await emailService.deleteScheduledEmail(req.params.id);
-
       return res.json(result);
     } catch (error: any) {
       return res.status(404).json({
